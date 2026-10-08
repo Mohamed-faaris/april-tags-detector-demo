@@ -1,0 +1,21 @@
+[project]
+name = "april-tag-relative-viewer"
+version = "0.1.0"
+description = "Live AprilTag detection with relative poses and configurable overlays"
+readme = "README.md"
+authors = [
+    { name = "Mohamed-faaris", email = "mohamedfaaris.dev@gmail.com" }
+]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "opencv-contrib-python>=4.8",
+    "pupil-apriltags>=1.0.4.post11",
+]
+
+[project.scripts]
+april-tag-viewer = "april_tag_relative_viewer.main:main"
+
+[build-system]
+requires = ["uv_build>=0.12.18,<0.13.0"]
+build-backend = "uv_build"
