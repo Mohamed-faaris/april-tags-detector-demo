@@ -1,0 +1,161 @@
+{
+  "exp_id": "026",
+  "pipeline": "qd05_norefine",
+  "pipeline_config": {
+    "pipeline": "qd05_norefine",
+    "families": "tag36h11",
+    "quad_decimate": 0.5,
+    "quad_sigma": 0.0,
+    "refine_edges": 0,
+    "decode_sharpening": 0.25,
+    "pose_backend": "tag_pose",
+    "nthreads": 2,
+    "tag_size_ref_m": 0.05
+  },
+  "method": "Blender 5.2.2 LTS render (frozen inputs); pupil-apriltags detect [pipeline=qd05_norefine qd=0.5 qs=0.0 refine=0 sharp=0.25 pose=tag_pose]; no lens distortion",
+  "family": "tag36h11",
+  "intrinsics_px": {
+    "fx": 500.0,
+    "fy": 500.0,
+    "cx": 320.0,
+    "cy": 240.0
+  },
+  "configured_tag_sizes_m": {
+    "0": 0.095,
+    "4": 0.06725
+  },
+  "tags": [
+    {
+      "id": 0,
+      "size_m": 0.095,
+      "expected_camera_xyz_m": [
+        -0.1264,
+        -0.0136,
+        0.8254
+      ],
+      "blender_euler_xyz_rad": [
+        -0.3209,
+        0.2689,
+        -0.0762
+      ]
+    },
+    {
+      "id": 4,
+      "size_m": 0.06725,
+      "expected_camera_xyz_m": [
+        0.1263,
+        -0.1189,
+        1.0648
+      ],
+      "blender_euler_xyz_rad": [
+        -0.5,
+        0.2555,
+        -0.0326
+      ]
+    }
+  ],
+  "frozen_input": "/home/mfk01/Projects/econ-systems/demo/experiments/inputs/026/input.png",
+  "detections": {
+    "0": {
+      "expected_camera_xyz_m": [
+        -0.1264,
+        -0.0136,
+        0.8254
+      ],
+      "pose_backend": "tag_pose",
+      "estimated_camera_xyz_m": [
+        -0.12790111641244226,
+        -0.013775406711128807,
+        0.8350323803744456
+      ],
+      "position_error_m": 0.00975022408337454,
+      "rotation_error_deg": 0.6150787727971693,
+      "corners_px": [
+        [
+          272.25,
+          207.78
+        ],
+        [
+          215.95,
+          202.58
+        ],
+        [
+          212.88,
+          257.29
+        ],
+        [
+          270.83,
+          261.05
+        ]
+      ],
+      "expected_blender_euler_xyz_rad": [
+        -0.3209,
+        0.2689,
+        -0.0762
+      ]
+    },
+    "4": {
+      "expected_camera_xyz_m": [
+        0.1263,
+        -0.1189,
+        1.0648
+      ],
+      "pose_backend": "tag_pose",
+      "estimated_camera_xyz_m": [
+        0.1280490525995402,
+        -0.12045519816810102,
+        1.078641240868608
+      ],
+      "position_error_m": 0.014037726850200704,
+      "rotation_error_deg": 0.2863384336642758,
+      "corners_px": [
+        [
+          391.38,
+          172.37
+        ],
+        [
+          362.56,
+          170.37
+        ],
+        [
+          366.78,
+          196.51
+        ],
+        [
+          396.37,
+          198.11
+        ]
+      ],
+      "expected_blender_euler_xyz_rad": [
+        -0.5,
+        0.2555,
+        -0.0326
+      ]
+    }
+  },
+  "all_expected_ids_detected": true,
+  "thresholds": {
+    "max_position_error_m": 0.03,
+    "max_relative_translation_error_m": 0.02,
+    "max_relative_distance_error_m": 0.02,
+    "max_rotation_error_deg": 5.0
+  },
+  "sanity_check_passed": true,
+  "relative_pose_from_id_0_to_id_4": {
+    "expected_xyz_m": [
+      -0.2987856038102632,
+      0.17024526503721776,
+      0.11832773423058487
+    ],
+    "estimated_xyz_m": [
+      -0.30150575304695354,
+      0.17286888669206707,
+      0.12428585087315616
+    ],
+    "translation_error_m": 0.007055618781095404,
+    "expected_distance_m": 0.3636725725154428,
+    "estimated_distance_m": 0.3691020777966844,
+    "distance_error_m": 0.005429505281241587,
+    "rotation_error_deg": 0.5609097159978758
+  }
+}

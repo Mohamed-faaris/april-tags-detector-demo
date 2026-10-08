@@ -1,0 +1,107 @@
+{
+  "pupil": {
+    "library": "pupil",
+    "config": {
+      "library": "pupil",
+      "quad_decimate": 0.5,
+      "quad_sigma": 0.8,
+      "refine_edges": 1,
+      "decode_sharpening": 0.25,
+      "pose_backend": "solvepnp_locked"
+    },
+    "num_experiments": 30,
+    "passed": 30,
+    "mean_detect_ms": 4.35,
+    "mean_tag0_pos_m": 0.00896486830351275,
+    "mean_tag0_rot_deg": 0.26979580690434285,
+    "mean_tag4_pos_m": 0.015058081719443566,
+    "mean_tag4_rot_deg": 0.5058210946590237,
+    "mean_rel_trans_m": 0.007330483572469035,
+    "mean_rel_dist_m": 0.006685898076932944,
+    "mean_rel_rot_deg": 0.6091450540267102
+  },
+  "dt": {
+    "library": "dt",
+    "config": {
+      "library": "dt",
+      "quad_decimate": 0.5,
+      "quad_sigma": 0.8,
+      "refine_edges": 1,
+      "decode_sharpening": 0.25,
+      "pose_backend": "solvepnp_locked"
+    },
+    "num_experiments": 30,
+    "passed": 30,
+    "mean_detect_ms": 4.1,
+    "mean_tag0_pos_m": 0.00896486830351275,
+    "mean_tag0_rot_deg": 0.26979580690434285,
+    "mean_tag4_pos_m": 0.015058081719443566,
+    "mean_tag4_rot_deg": 0.5058210946590237,
+    "mean_rel_trans_m": 0.007330483572469035,
+    "mean_rel_dist_m": 0.006685898076932944,
+    "mean_rel_rot_deg": 0.6091450540267102
+  },
+  "apriltag": {
+    "library": "apriltag",
+    "config": {
+      "library": "apriltag",
+      "quad_decimate": 0.5,
+      "quad_sigma": 0.8,
+      "refine_edges": 1,
+      "decode_sharpening": 0.25,
+      "pose_backend": "solvepnp_locked"
+    },
+    "num_experiments": 30,
+    "passed": 28,
+    "mean_detect_ms": 2.82,
+    "mean_tag0_pos_m": 0.007890490984158073,
+    "mean_tag0_rot_deg": 0.7539874261487997,
+    "mean_tag4_pos_m": 0.0051144912085403366,
+    "mean_tag4_rot_deg": 1.5861144502583189,
+    "mean_rel_trans_m": 0.010972832798832433,
+    "mean_rel_dist_m": 0.005974790991524976,
+    "mean_rel_rot_deg": 1.74154178657965
+  },
+  "opencv": {
+    "library": "opencv",
+    "config": {
+      "library": "opencv",
+      "quad_decimate": 0.5,
+      "quad_sigma": 0.8,
+      "refine_edges": 1,
+      "decode_sharpening": 0.25,
+      "pose_backend": "solvepnp_locked"
+    },
+    "num_experiments": 30,
+    "passed": 13,
+    "mean_detect_ms": 1.98,
+    "mean_tag0_pos_m": 0.01459215168825314,
+    "mean_tag0_rot_deg": 1.806307196603878,
+    "mean_tag4_pos_m": 0.02951315736147274,
+    "mean_tag4_rot_deg": 6.17549185160111,
+    "mean_rel_trans_m": 0.0195481905762866,
+    "mean_rel_dist_m": 0.014748002735605538,
+    "mean_rel_rot_deg": 6.971586666745042
+  },
+  "opencv_subpix": {
+    "library": "opencv_subpix",
+    "config": {
+      "library": "opencv_subpix",
+      "quad_decimate": 0.5,
+      "quad_sigma": 0.8,
+      "refine_edges": 1,
+      "decode_sharpening": 0.25,
+      "pose_backend": "solvepnp_locked"
+    },
+    "num_experiments": 30,
+    "passed": 9,
+    "mean_detect_ms": 2.03,
+    "mean_tag0_pos_m": 0.012745878298385447,
+    "mean_tag0_rot_deg": 0.29193572598961115,
+    "mean_tag4_pos_m": 0.03292471794236067,
+    "mean_tag4_rot_deg": 5.629996076526703,
+    "mean_rel_trans_m": 0.021164512580066918,
+    "mean_rel_dist_m": 0.018186819887543827,
+    "mean_rel_rot_deg": 5.649650013322289
+  }
+}

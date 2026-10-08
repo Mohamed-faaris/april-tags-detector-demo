@@ -12,6 +12,8 @@ name = "april-tag-relative-viewer"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "apriltag" },
+    { name = "dt-apriltags" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
     { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
@@ -21,9 +23,32 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "apriltag", specifier = ">=0.0.16" },
+    { name = "dt-apriltags", specifier = ">=3.1.7" },
     { name = "numpy", specifier = ">=1.24" },
     { name = "opencv-contrib-python", specifier = ">=4.8" },
     { name = "pupil-apriltags", specifier = ">=1.0.4.post11" },
+]
+
+[[package]]
+name = "apriltag"
+version = "0.0.16"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f2/e5/957bb26d575141bc25af7214c14e315c9ebb9a12ccf7c8d09ed40b59bb29/apriltag-0.0.16.tar.gz", hash = "sha256:151e37f5a88bb81726e2bda82938d7e22844131d5894ed9f30eabcd3b8beb071", size = 201239, upload-time = "2018-12-07T11:23:56.893Z" }
+
+[[package]]
+name = "dt-apriltags"
+version = "3.1.7"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
+    { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/79/8d/0ecbfa06d14c754471a9e6ab379c5de94ddeab9f7d5618cbe121fce67b89/dt_apriltags-3.1.7-py3-none-linux_armv7l.whl", hash = "sha256:ffef2ec5b67d8419d92ef8cbcec18bc131c1c6a8a33f441cf08d44ea06fb501a", size = 1160855, upload-time = "2021-10-06T20:50:52.829Z" },
+    { url = "https://files.pythonhosted.org/packages/5d/6c/0c1c40b420e82c9b078ae99c875b3ec3a357597647d9bed080719ee8b829/dt_apriltags-3.1.7-py3-none-manylinux2010_x86_64.whl", hash = "sha256:946fc0cf9a5c6d884ca35e693268aac6248b78717749c93e92a516a85746f0ea", size = 1186855, upload-time = "2021-10-06T20:50:54.128Z" },
+    { url = "https://files.pythonhosted.org/packages/3b/44/5daee1bef9bb4aed7c81a362da5a5a2902a6d7a4b54b98b0b4b087686990/dt_apriltags-3.1.7-py3-none-manylinux2014_aarch64.whl", hash = "sha256:9e149899b72291619adc13424343837714ad0d6d80d7878168e1fa0248df4262", size = 1172549, upload-time = "2021-10-06T20:50:55.413Z" },
 ]
 
 [[package]]

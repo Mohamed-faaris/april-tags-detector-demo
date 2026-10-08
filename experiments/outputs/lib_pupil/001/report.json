@@ -1,0 +1,117 @@
+{
+  "exp_id": "001",
+  "library": "pupil",
+  "detector_config": {
+    "library": "pupil",
+    "quad_decimate": 0.5,
+    "quad_sigma": 0.8,
+    "refine_edges": 1,
+    "decode_sharpening": 0.25,
+    "pose_backend": "solvepnp_locked"
+  },
+  "pose_backend": "solvepnp_locked",
+  "family": "tag36h11",
+  "corner_mapping": {
+    "0": [
+      0,
+      0,
+      1
+    ],
+    "4": [
+      1,
+      0,
+      0
+    ]
+  },
+  "detections": {
+    "0": {
+      "expected_camera_xyz_m": [
+        -0.163,
+        -0.037,
+        0.8717
+      ],
+      "estimated_camera_xyz_m": [
+        -0.16517706485366987,
+        -0.03744934635552375,
+        0.8829435138463285
+      ],
+      "position_error_m": 0.011461157321007663,
+      "rotation_error_deg": 0.05242528005001864,
+      "corners_px": [
+        [
+          253.57,
+          192.66
+        ],
+        [
+          200.37,
+          194.26
+        ],
+        [
+          198.74,
+          245.66
+        ],
+        [
+          253.14,
+          244.01
+        ]
+      ]
+    },
+    "4": {
+      "expected_camera_xyz_m": [
+        0.1722,
+        -0.0831,
+        1.0518
+      ],
+      "estimated_camera_xyz_m": [
+        0.1747907180471443,
+        -0.0843951308568296,
+        1.0673626215660024
+      ],
+      "position_error_m": 0.015829857041133103,
+      "rotation_error_deg": 0.6647223206831986,
+      "corners_px": [
+        [
+          415.68,
+          184.87
+        ],
+        [
+          384.59,
+          188.95
+        ],
+        [
+          387.65,
+          216.2
+        ],
+        [
+          419.96,
+          212.54
+        ]
+      ]
+    }
+  },
+  "all_expected_ids_detected": true,
+  "thresholds": {
+    "max_position_error_m": 0.03,
+    "max_relative_translation_error_m": 0.02,
+    "max_relative_distance_error_m": 0.02,
+    "max_rotation_error_deg": 5.0
+  },
+  "sanity_check_passed": true,
+  "relative_pose_from_id_0_to_id_4": {
+    "expected_xyz_m": [
+      -0.3363382263091529,
+      0.08103601452558146,
+      0.16501521709534206
+    ],
+    "estimated_xyz_m": [
+      -0.34124523825447317,
+      0.08280843012213471,
+      0.16878050436710465
+    ],
+    "translation_error_m": 0.00643409756821565,
+    "expected_distance_m": 0.3833017871077567,
+    "estimated_distance_m": 0.3896054509180523,
+    "distance_error_m": 0.006303663810295623,
+    "rotation_error_deg": 0.614979013253857
+  }
+}

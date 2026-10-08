@@ -378,9 +378,55 @@ def save_annotated_image(
     cv2.imwrite(str(out_path), annotated)
 
 
+def solvepnp_pose(corners_px: np.ndarray, size_m: float,
+                  prior_R: np.ndarray | None = None) -> tuple[np.ndarray, np.ndarray] | None:
+    """Pose via cv2.solvePnP with correspondence disambiguated by a prior rotation.
+
+    The pupil-apriltags corner order / tag-frame handedness is not assumed:
+    y-down and y-up object-point conventions x 4 cyclic shifts are tried, and
+    the candidate closest to prior_R (the detector's own rotation, which is
+    size-independent) is kept. This dodges the planar-pose 180° ambiguity that
+    reprojection error alone cannot resolve. Returns (t, R) or None.
+    """
+    h = size_m / 2.0
+    obj_variants = [
+        np.array([[-h, -h, 0], [h, -h, 0], [h, h, 0], [-h, h, 0]], dtype=np.float64),
+        np.array([[-h, h, 0], [h, h, 0], [h, -h, 0], [-h, -h, 0]], dtype=np.float64),
+    ]
+    cam = np.array([[FOCAL_PIXELS, 0, WIDTH / 2.0],
+                    [0, FOCAL_PIXELS, HEIGHT / 2.0], [0, 0, 1]], dtype=np.float64)
+    img = np.ascontiguousarray(np.asarray(corners_px, dtype=np.float64).reshape(4, 2))
+    best: tuple[float, np.ndarray, np.ndarray] | None = None
+    for obj in obj_variants:
+        for shift in range(4):
+            ordered = np.ascontiguousarray(np.roll(img, shift, axis=0))
+            ok, rvec, tvec = cv2.solvePnP(obj, ordered, cam, None, flags=cv2.SOLVEPNP_ITERATIVE)
+            if not ok:
+                continue
+            R = cv2.Rodrigues(rvec)[0]
+            score = rotation_error_deg(R, prior_R) if prior_R is not None else 0.0
+            if best is None or score < best[0]:
+                best = (score, tvec.reshape(3), R)
+    if best is None:
+        return None
+    return best[1], best[2]
+
+
+def detect_pose(detection, pose_backend: str) -> tuple[np.ndarray, np.ndarray] | None:
+    """Estimate (t, R) for one detection with the chosen pose backend."""
+    tag_id = int(detection.tag_id)
+    if pose_backend == "solvepnp":
+        return solvepnp_pose(np.asarray(detection.corners), TAG_SIZES_M[tag_id],
+                             np.asarray(detection.pose_R, dtype=float))
+    size_scale = TAG_SIZES_M[tag_id] / REFERENCE_SIZE_M
+    t = np.asarray(detection.pose_t, dtype=float).reshape(3) * size_scale
+    return t, np.asarray(detection.pose_R, dtype=float)
+
+
 def evaluate_specs(
     specs: list[tuple[int, float, tuple[float, float, float], tuple[float, float, float]]],
     detections: list,
+    pose_backend: str = "tag_pose",
 ) -> tuple[dict[int, dict[str, object]], dict[int, tuple[np.ndarray, np.ndarray]], dict[int, object]]:
     expected_pos = {tag_id: np.asarray(pos, dtype=float) for tag_id, _, pos, _ in specs}
     expected_rot = {tag_id: expected_rotation_cv(rot) for tag_id, _, _, rot in specs}
@@ -393,12 +439,14 @@ def evaluate_specs(
             continue
         if tag_id in detections_by_id:
             continue
-        size_scale = TAG_SIZES_M[tag_id] / REFERENCE_SIZE_M
-        estimated_position = np.asarray(detection.pose_t, dtype=float).reshape(3) * size_scale
-        estimated_rotation = np.asarray(detection.pose_R, dtype=float)
+        pose = detect_pose(detection, pose_backend)
+        if pose is None:
+            continue
+        estimated_position, estimated_rotation = pose
         rotation_error = rotation_error_deg(estimated_rotation, expected_rot[tag_id])
         detected[tag_id] = {
             "expected_camera_xyz_m": expected_pos[tag_id].tolist(),
+            "pose_backend": pose_backend,
             "estimated_camera_xyz_m": estimated_position.tolist(),
             "position_error_m": float(np.linalg.norm(estimated_position - expected_pos[tag_id])),
             "rotation_error_deg": rotation_error,
@@ -512,7 +560,8 @@ def process_experiment(exp_id: str,
                        detector: Detector,
                        pipeline: str,
                        pipeline_config: dict[str, object],
-                       method: str) -> dict[str, object]:
+                       method: str,
+                       pose_backend: str = "tag_pose") -> dict[str, object]:
     """STAGE 2 (no Blender): run a processing pipeline on a frozen input image.
 
     Reads inputs/<exp_id>/{input.png, ground_truth.json}, writes
@@ -539,7 +588,7 @@ def process_experiment(exp_id: str,
         rendered, estimate_tag_pose=True,
         camera_params=intrinsics, tag_size=REFERENCE_SIZE_M,
     )
-    detected, estimated_poses, detections_by_id = evaluate_specs(specs, detections)
+    detected, estimated_poses, detections_by_id = evaluate_specs(specs, detections, pose_backend)
     passed, relative_pose = check_thresholds(detected, estimated_poses, specs)
     outputs_exp_dir.mkdir(parents=True, exist_ok=True)
     save_annotated_image(render_bgr, detections_by_id, estimated_poses, detected,
@@ -593,7 +642,9 @@ def run_single_experiment(
 
 def run_batch(poses_csv: Path, experiments_root: Path, assets_dir: Path, blender_exe: str,
               stage: str = "both", pipeline: str = "baseline",
-              quad_decimate: float = 1.0, nthreads: int = 2) -> int:
+              quad_decimate: float = 1.0, nthreads: int = 2,
+              quad_sigma: float = 0.0, refine_edges: int = 1,
+              decode_sharpening: float = 0.25, pose_backend: str = "tag_pose") -> int:
     """Run render and/or process stages with separated inputs/outputs layout."""
     rows = load_poses_csv(poses_csv)
     if not rows:
@@ -611,7 +662,9 @@ def run_batch(poses_csv: Path, experiments_root: Path, assets_dir: Path, blender
           f"(640x{HEIGHT}, fx={FOCAL_PIXELS}, margin=25px).")
     pipeline_config: dict[str, object] = {
         "pipeline": pipeline, "families": "tag36h11",
-        "quad_decimate": quad_decimate, "nthreads": nthreads,
+        "quad_decimate": quad_decimate, "quad_sigma": quad_sigma,
+        "refine_edges": refine_edges, "decode_sharpening": decode_sharpening,
+        "pose_backend": pose_backend, "nthreads": nthreads,
         "tag_size_ref_m": REFERENCE_SIZE_M,
     }
     if stage in ("both", "render"):
@@ -624,15 +677,19 @@ def run_batch(poses_csv: Path, experiments_root: Path, assets_dir: Path, blender
             print(f"[{exp_id}] input frozen -> {inputs_root / exp_id / 'input.png'}")
         write_inputs_map(experiments_root, rows)
     if stage in ("both", "process"):
-        detector = Detector(families="tag36h11", nthreads=nthreads, quad_decimate=quad_decimate)
+        detector = Detector(families="tag36h11", nthreads=nthreads, quad_decimate=quad_decimate,
+                            quad_sigma=quad_sigma, refine_edges=refine_edges,
+                            decode_sharpening=decode_sharpening)
         try:
             blender_version = subprocess.run(
                 [blender_exe, "--version"], capture_output=True, text=True, check=True
             ).stdout.splitlines()[0]
         except Exception:
             blender_version = "blender (version unknown at process time)"
-        method = (f"{blender_version} render (frozen inputs); pupil-apriltags pose "
-                  f"[pipeline={pipeline} quad_decimate={quad_decimate}]; no lens distortion")
+        method = (f"{blender_version} render (frozen inputs); pupil-apriltags detect "
+                  f"[pipeline={pipeline} qd={quad_decimate} qs={quad_sigma} "
+                  f"refine={refine_edges} sharp={decode_sharpening} pose={pose_backend}]; "
+                  f"no lens distortion")
         summary_rows: list[dict[str, object]] = []
         all_passed = True
         for row in rows:
@@ -640,7 +697,7 @@ def run_batch(poses_csv: Path, experiments_root: Path, assets_dir: Path, blender
             print(f"[{exp_id}] processing pipeline={pipeline} ...")
             report = process_experiment(exp_id, inputs_root / exp_id,
                                         pipeline_root / exp_id, detector,
-                                        pipeline, pipeline_config, method)
+                                        pipeline, pipeline_config, method, pose_backend)
             rel = report.get("relative_pose_from_id_0_to_id_4", {})
             summary_rows.append({
                 "exp_id": exp_id,
@@ -772,6 +829,15 @@ def main() -> int:
                              "processing configs can be compared without re-rendering)")
     parser.add_argument("--quad-decimate", type=float, default=1.0,
                         help="pupil-apriltags quad_decimate for the process stage (try 1.0 vs 0.5)")
+    parser.add_argument("--quad-sigma", type=float, default=0.0,
+                        help="pupil-apriltags quad_sigma (Gaussian blur on decimated image)")
+    parser.add_argument("--refine-edges", type=int, default=1, choices=[0, 1],
+                        help="pupil-apriltags edge refinement toggle")
+    parser.add_argument("--decode-sharpening", type=float, default=0.25,
+                        help="pupil-apriltags decode sharpening")
+    parser.add_argument("--pose-backend", default="tag_pose", choices=["tag_pose", "solvepnp"],
+                        help="tag_pose: detector pose scaled to true size; "
+                             "solvepnp: cv2.solvePnP on corners with true tag size")
     parser.add_argument("--nthreads", type=int, default=2)
     parser.add_argument("--fov-margin-px", type=int, default=25,
                         help="FOV guard margin used when generating/validating the poses CSV")
@@ -800,7 +866,10 @@ def main() -> int:
         return run_batch(args.poses_csv.resolve(), args.experiments_root.resolve(),
                          assets.resolve(), args.blender, stage=args.stage,
                          pipeline=args.pipeline, quad_decimate=args.quad_decimate,
-                         nthreads=args.nthreads)
+                         nthreads=args.nthreads, quad_sigma=args.quad_sigma,
+                         refine_edges=args.refine_edges,
+                         decode_sharpening=args.decode_sharpening,
+                         pose_backend=args.pose_backend)
 
     return run_legacy_single(args.output_dir.resolve(), args.blender)
 
