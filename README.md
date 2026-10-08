@@ -47,3 +47,13 @@ The default family is AprilTag `36h11`, which detects the markers shown in the s
 | `Q` or `Esc` | Quit |
 
 The relative transform uses the camera-space pose of the origin tag as its reference: `R_rel = R_originᵀ R_tag`, `t_rel = R_originᵀ (t_tag - t_origin)`. Euler angles use the decomposition `Rz(rz) Ry(ry) Rx(rx)`.
+
+## Reproducible Blender pose sanity check
+
+Run the saved script to generate AprilTag 36h11 markers, build and render a Blender scene with known tag sizes and poses, then compare `pupil-apriltags` estimates to Blender ground truth:
+
+```sh
+uv run python scripts/blender_pose_sanity.py --blender blender
+```
+
+Outputs are saved under `artifacts/blender_pose_sanity/`: the Blender scene script, `.blend` scene, rendered PNG, source marker PNGs, and `pose_report.json`. The current Blender 5.2.2 run passed: maximum per-tag position error was 2.14 cm; relative translation error was 1.34 cm, distance error 1.17 cm, and rotation error 1.96°. The check uses ideal camera intrinsics with no lens distortion, so it is a pipeline sanity check rather than a substitute for real camera calibration.
