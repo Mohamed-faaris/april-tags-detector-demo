@@ -552,9 +552,11 @@ def main() -> None:
             corners = [np.asarray(detection.corners, dtype=np.float32) for detection in detections]
             ids = np.asarray([detection.tag_id for detection in detections], dtype=np.int32)
             poses: dict[int, tuple[np.ndarray, np.ndarray]] = {}
+            sizes_used: dict[int, float] = {}
             for detection in detections:
                 marker_id = int(detection.tag_id)
                 size = marker_sizes.get(marker_id, args.tag_size)
+                sizes_used[marker_id] = size
                 rotation = np.asarray(detection.pose_R, dtype=np.float64)
                 # AprilTag pose translation scales linearly with physical tag edge size.
                 translation = np.asarray(detection.pose_t, dtype=np.float64).reshape(3) * (size / args.tag_size)
@@ -580,7 +582,7 @@ def main() -> None:
             cv2.putText(frame, state, (max(12, width - 285), 26), cv2.FONT_HERSHEY_SIMPLEX, 0.58, (255, 255, 255), 2, cv2.LINE_AA)
             if overlays.help:
                 draw_help(frame, overlays)
-            display = draw_pose_table(frame, poses, overlays, table_scroll, marker_sizes)
+            display = draw_pose_table(frame, poses, overlays, table_scroll, sizes_used)
             cv2.imshow("AprilTag relative pose", display)
             key = cv2.waitKey(1) & 0xFF
             if key in (ord("q"), 27):
