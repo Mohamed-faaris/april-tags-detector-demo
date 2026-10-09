@@ -166,6 +166,41 @@ def load_calibration_file(path: Path) -> tuple[np.ndarray, np.ndarray, tuple[int
                      f"camera_calibration.npz / camera_calibration.json / camera_info.yaml")
 
 
+def log_camera_info(capture: cv2.VideoCapture, source, width: int, height: int,
+                    args: argparse.Namespace) -> None:
+    """Log source, stream properties and calibration summary on camera open."""
+    try:
+        backend = capture.getBackendName()
+    except Exception:
+        backend = "unknown"
+    fourcc = int(capture.get(cv2.CAP_PROP_FOURCC))
+    fourcc_str = "".join(chr((fourcc >> (8 * i)) & 0xFF) for i in range(4)).strip() or "n/a"
+    print(f"[camera] source={source!r} backend={backend} "
+          f"size={width}x{height} "
+          f"fps={capture.get(cv2.CAP_PROP_FPS):.1f} "
+          f"fourcc={fourcc_str} "
+          f"exposure={capture.get(cv2.CAP_PROP_EXPOSURE):.1f} "
+          f"gain={capture.get(cv2.CAP_PROP_GAIN):.1f}")
+    if args.calibration:
+        try:
+            camera, dist, calib_size, rms = load_calibration_file(args.calibration)
+            size_note = ""
+            if calib_size is not None:
+                size_note = (", matches frames" if tuple(calib_size) == (width, height)
+                             else f", calibrated for {calib_size[0]}x{calib_size[1]} (will scale)")
+            rms_note = f", rms {rms:.3f}px" if rms is not None else ""
+            print(f"[camera] calibration={args.calibration} "
+                  f"fx={camera[0, 0]:.1f} fy={camera[1, 1]:.1f} "
+                  f"cx={camera[0, 2]:.1f} cy={camera[1, 2]:.1f} "
+                  f"dist={np.asarray(dist).ravel().round(4).tolist()}{rms_note}{size_note}")
+        except Exception as exc:
+            print(f"[camera] calibration {args.calibration} unreadable: {exc}")
+    else:
+        print(f"[camera] no --calibration; pinhole from --fov {args.fov}°, zero distortion")
+    print(f"[camera] detector=tag{args.dictionary} qd={args.quad_decimate} qs={args.quad_sigma} "
+          f"pose={args.pose_backend} smooth={args.smooth_alpha} max_reproj={args.max_reproj_px}px")
+
+
 def camera_model(width: int, height: int, calibration: Path | None, fov: float) -> tuple[np.ndarray, np.ndarray]:
     if calibration:
         camera, dist, calib_size, rms = load_calibration_file(calibration)
@@ -446,6 +481,9 @@ def main() -> None:
     if not ok:
         capture.release()
         raise SystemExit(f"Could not read frames from camera or video source {args.source!r}")
+
+    height, width = frame.shape[:2]
+    log_camera_info(capture, source, width, height, args)
 
     detector = Detector(
         families=f"tag{args.dictionary}",
