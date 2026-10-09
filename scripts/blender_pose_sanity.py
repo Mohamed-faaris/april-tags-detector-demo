@@ -217,14 +217,24 @@ def ensure_tag_images(cache_dir: Path) -> None:
 
 def generate_poses_csv(path: Path, num_experiments: int = 30, seed: int = 11,
                        fov_margin_px: int = 25, min_center_sep_px: float = 90.0,
-                       max_tilt_deg: float = 55.0) -> Path:
+                       max_tilt_deg: float = 55.0,
+                       pos_xy_range: float = 0.05,
+                       z0_range: tuple[float, float] = (0.72, 0.88),
+                       z4_range: tuple[float, float] = (0.97, 1.13),
+                       rot_xy_max: float = 0.45, rot_z_max: float = 0.15,
+                       rel_rot_max: float = 0.20) -> Path:
     """Write a deterministic CSV with FOV-validated poses in different orientations.
 
     Every accepted row is guaranteed (under the pinhole model, no distortion):
       * all 8 tag corners project strictly inside the WxH image with margin,
       * tag plane tilt vs. the camera axis < max_tilt_deg,
       * tag centres are at least min_center_sep_px apart (limits overlap).
-    Rejection sampling with the given seed keeps the 30 poses deterministic.
+    Rejection sampling with the given seed keeps poses deterministic.
+
+    Variability knobs: pos_xy_range (m, around base centres), z0/z4 ranges (m,
+    use higher values for long-distance cases), rot_xy_max (rad, per-tag
+    pitch/yaw magnitude), rot_z_max (rad roll), rel_rot_max (rad extra
+    tag-4-vs-tag-0 rotation so relative poses vary too).
     """
     rng = np.random.default_rng(seed)
     path = path.resolve()
@@ -233,25 +243,25 @@ def generate_poses_csv(path: Path, num_experiments: int = 30, seed: int = 11,
     attempts = 0
     while len(rows) < num_experiments:
         attempts += 1
-        if attempts > num_experiments * 500:
+        if attempts > num_experiments * 2000:
             raise RuntimeError("Could not find enough FOV-valid poses; relax margins")
         i = len(rows) + 1
-        rx0 = float(rng.uniform(-0.35, 0.35))
-        ry0 = float(rng.uniform(-0.45, 0.45))
-        rz0 = float(rng.uniform(-0.15, 0.15))
+        rx0 = float(rng.uniform(-rot_xy_max, rot_xy_max))
+        ry0 = float(rng.uniform(-rot_xy_max, rot_xy_max))
+        rz0 = float(rng.uniform(-rot_z_max, rot_z_max))
         # Tag 4 gets its own orientation so the relative pose varies too.
-        rx4 = float(np.clip(rx0 + rng.uniform(-0.20, 0.20), -0.50, 0.50))
-        ry4 = float(np.clip(ry0 + rng.uniform(-0.20, 0.20), -0.55, 0.55))
-        rz4 = float(np.clip(rz0 + rng.uniform(-0.10, 0.10), -0.25, 0.25))
+        rx4 = float(rx0 + rng.uniform(-rel_rot_max, rel_rot_max))
+        ry4 = float(ry0 + rng.uniform(-rel_rot_max, rel_rot_max))
+        rz4 = float(rz0 + rng.uniform(-rel_rot_max / 2, rel_rot_max / 2))
         candidate = {
             "exp_id": f"{i:03d}",
-            "tag0_x": round(float(-0.12 + rng.uniform(-0.05, 0.05)), 4),
-            "tag0_y": round(float(0.00 + rng.uniform(-0.05, 0.05)), 4),
-            "tag0_z": round(float(0.80 + rng.uniform(-0.08, 0.08)), 4),
+            "tag0_x": round(float(-0.12 + rng.uniform(-pos_xy_range, pos_xy_range)), 4),
+            "tag0_y": round(float(0.00 + rng.uniform(-pos_xy_range, pos_xy_range)), 4),
+            "tag0_z": round(float(rng.uniform(*z0_range)), 4),
             "tag0_rx": round(rx0, 4), "tag0_ry": round(ry0, 4), "tag0_rz": round(rz0, 4),
-            "tag4_x": round(float(0.16 + rng.uniform(-0.05, 0.05)), 4),
-            "tag4_y": round(float(-0.07 + rng.uniform(-0.05, 0.05)), 4),
-            "tag4_z": round(float(1.05 + rng.uniform(-0.08, 0.08)), 4),
+            "tag4_x": round(float(0.16 + rng.uniform(-pos_xy_range, pos_xy_range)), 4),
+            "tag4_y": round(float(-0.07 + rng.uniform(-pos_xy_range, pos_xy_range)), 4),
+            "tag4_z": round(float(rng.uniform(*z4_range)), 4),
             "tag4_rx": round(rx4, 4), "tag4_ry": round(ry4, 4), "tag4_rz": round(rz4, 4),
         }
         ok, _reason = check_specs_in_fov(
@@ -527,13 +537,17 @@ def render_experiment(exp_id: str,
                       specs: list[tuple[int, float, tuple[float, float, float], tuple[float, float, float]]],
                       inputs_exp_dir: Path,
                       assets_dir: Path,
-                      blender_exe: str) -> dict[str, object]:
+                      blender_exe: str,
+                      fov_margin_px: int = 25, min_center_sep_px: float = 90.0,
+                      max_tilt_deg: float = 55.0) -> dict[str, object]:
     """STAGE 1 (Blender): render the frozen input image + ground-truth map.
 
     Writes inputs/<exp_id>/{input.png, ground_truth.json, build_scene.py, scene.blend}.
     Same tag textures (tag_0.png / tag_4.png from assets_dir) are reused.
     """
-    ok, reason = check_specs_in_fov(specs)
+    ok, reason = check_specs_in_fov(specs, margin_px=fov_margin_px,
+                                    min_center_sep_px=min_center_sep_px,
+                                    max_tilt_deg=max_tilt_deg)
     if not ok:
         raise ValueError(f"[{exp_id}] pose outside camera FOV map: {reason}")
     inputs_exp_dir.mkdir(parents=True, exist_ok=True)
@@ -644,7 +658,9 @@ def run_batch(poses_csv: Path, experiments_root: Path, assets_dir: Path, blender
               stage: str = "both", pipeline: str = "baseline",
               quad_decimate: float = 1.0, nthreads: int = 2,
               quad_sigma: float = 0.0, refine_edges: int = 1,
-              decode_sharpening: float = 0.25, pose_backend: str = "tag_pose") -> int:
+              decode_sharpening: float = 0.25, pose_backend: str = "tag_pose",
+              fov_margin_px: int = 25, min_center_sep_px: float = 90.0,
+              max_tilt_deg: float = 55.0) -> int:
     """Run render and/or process stages with separated inputs/outputs layout."""
     rows = load_poses_csv(poses_csv)
     if not rows:
@@ -655,7 +671,9 @@ def run_batch(poses_csv: Path, experiments_root: Path, assets_dir: Path, blender
     # Camera-FOV map check BEFORE any expensive Blender call.
     for row in rows:
         exp_id = str(row["exp_id"]).zfill(3) if str(row["exp_id"]).isdigit() else str(row["exp_id"])
-        ok, reason = check_specs_in_fov(row_to_specs(row))
+        ok, reason = check_specs_in_fov(row_to_specs(row), margin_px=fov_margin_px,
+                                        min_center_sep_px=min_center_sep_px,
+                                        max_tilt_deg=max_tilt_deg)
         if not ok:
             raise ValueError(f"[{exp_id}] pose outside camera FOV map: {reason} (fix CSV first)")
     print(f"FOV map check passed for {len(rows)} experiments "
@@ -673,7 +691,8 @@ def run_batch(poses_csv: Path, experiments_root: Path, assets_dir: Path, blender
             exp_id = str(row["exp_id"]).zfill(3) if str(row["exp_id"]).isdigit() else str(row["exp_id"])
             print(f"[{exp_id}] rendering (same tags) ...")
             render_experiment(exp_id, row_to_specs(row), inputs_root / exp_id,
-                              assets_dir, blender_exe)
+                              assets_dir, blender_exe, fov_margin_px,
+                              min_center_sep_px, max_tilt_deg)
             print(f"[{exp_id}] input frozen -> {inputs_root / exp_id / 'input.png'}")
         write_inputs_map(experiments_root, rows)
     if stage in ("both", "process"):
@@ -841,6 +860,20 @@ def main() -> int:
     parser.add_argument("--nthreads", type=int, default=2)
     parser.add_argument("--fov-margin-px", type=int, default=25,
                         help="FOV guard margin used when generating/validating the poses CSV")
+    parser.add_argument("--min-center-sep-px", type=float, default=90.0)
+    parser.add_argument("--max-tilt-deg", type=float, default=55.0)
+    parser.add_argument("--pos-xy-range", type=float, default=0.05,
+                        help="XY position spread (m) around base centres for generated poses")
+    parser.add_argument("--z0-range", type=float, nargs=2, default=(0.72, 0.88),
+                        metavar=("Z0_MIN", "Z0_MAX"),
+                        help="Depth range (m) for tag 0 (higher = longer distance)")
+    parser.add_argument("--z4-range", type=float, nargs=2, default=(0.97, 1.13),
+                        metavar=("Z4_MIN", "Z4_MAX"))
+    parser.add_argument("--rot-xy-max", type=float, default=0.45,
+                        help="Max per-tag pitch/yaw magnitude (rad) for generated poses")
+    parser.add_argument("--rot-z-max", type=float, default=0.15)
+    parser.add_argument("--rel-rot-max", type=float, default=0.20,
+                        help="Max extra tag-4-vs-tag-0 rotation (rad)")
     parser.add_argument("--generate-poses-csv", type=Path, default=None,
                         help="Generate a poses CSV with different orientations and exit")
     parser.add_argument("--num-experiments", type=int, default=30)
@@ -849,7 +882,15 @@ def main() -> int:
 
     if args.generate_poses_csv is not None:
         out = generate_poses_csv(args.generate_poses_csv, args.num_experiments, args.seed,
-                                 fov_margin_px=args.fov_margin_px)
+                                 fov_margin_px=args.fov_margin_px,
+                                 min_center_sep_px=args.min_center_sep_px,
+                                 max_tilt_deg=args.max_tilt_deg,
+                                 pos_xy_range=args.pos_xy_range,
+                                 z0_range=tuple(args.z0_range),
+                                 z4_range=tuple(args.z4_range),
+                                 rot_xy_max=args.rot_xy_max,
+                                 rot_z_max=args.rot_z_max,
+                                 rel_rot_max=args.rel_rot_max)
         print(f"Wrote {args.num_experiments} FOV-validated poses to {out}")
         if args.poses_csv is None:
             return 0
@@ -869,7 +910,10 @@ def main() -> int:
                          nthreads=args.nthreads, quad_sigma=args.quad_sigma,
                          refine_edges=args.refine_edges,
                          decode_sharpening=args.decode_sharpening,
-                         pose_backend=args.pose_backend)
+                         pose_backend=args.pose_backend,
+                         fov_margin_px=args.fov_margin_px,
+                         min_center_sep_px=args.min_center_sep_px,
+                         max_tilt_deg=args.max_tilt_deg)
 
     return run_legacy_single(args.output_dir.resolve(), args.blender)
 
