@@ -1,0 +1,21 @@
+{
+  "library": "opencv_subpix",
+  "config": {
+    "library": "opencv_subpix",
+    "quad_decimate": 0.5,
+    "quad_sigma": 0.8,
+    "refine_edges": 1,
+    "decode_sharpening": 0.25,
+    "pose_backend": "solvepnp_locked"
+  },
+  "num_experiments": 60,
+  "passed": 3,
+  "mean_detect_ms": 3.38,
+  "mean_tag0_pos_m": 0.01611325554959023,
+  "mean_tag0_rot_deg": 0.4232476692594383,
+  "mean_tag4_pos_m": 0.054589818714784175,
+  "mean_tag4_rot_deg": 10.403716066055773,
+  "mean_rel_trans_m": 0.04063331612032595,
+  "mean_rel_dist_m": 0.03668889992109698,
+  "mean_rel_rot_deg": 10.317546092235352
+}

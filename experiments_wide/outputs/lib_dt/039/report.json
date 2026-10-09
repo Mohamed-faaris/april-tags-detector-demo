@@ -1,0 +1,68 @@
+{
+  "exp_id": "039",
+  "library": "dt",
+  "detector_config": {
+    "library": "dt",
+    "quad_decimate": 0.5,
+    "quad_sigma": 0.8,
+    "refine_edges": 1,
+    "decode_sharpening": 0.25,
+    "pose_backend": "solvepnp_locked"
+  },
+  "pose_backend": "solvepnp_locked",
+  "family": "tag36h11",
+  "corner_mapping": {
+    "0": [
+      1,
+      0,
+      0
+    ],
+    "4": [
+      1,
+      0,
+      0
+    ]
+  },
+  "detections": {
+    "0": {
+      "expected_camera_xyz_m": [
+        -0.0399,
+        -0.1228,
+        1.105
+      ],
+      "estimated_camera_xyz_m": [
+        -0.04045034998447342,
+        -0.1244612304084106,
+        1.1202298623433216
+      ],
+      "position_error_m": 0.01533007757879139,
+      "rotation_error_deg": 0.2270678638877135,
+      "corners_px": [
+        [
+          320.51,
+          170.06
+        ],
+        [
+          281.17,
+          163.4
+        ],
+        [
+          282.07,
+          199.84
+        ],
+        [
+          322.94,
+          205.65
+        ]
+      ]
+    }
+  },
+  "all_expected_ids_detected": false,
+  "thresholds": {
+    "max_position_error_m": 0.03,
+    "max_relative_translation_error_m": 0.02,
+    "max_relative_distance_error_m": 0.02,
+    "max_rotation_error_deg": 5.0
+  },
+  "sanity_check_passed": false
+}

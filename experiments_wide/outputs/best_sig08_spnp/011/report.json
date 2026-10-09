@@ -1,0 +1,106 @@
+{
+  "exp_id": "011",
+  "pipeline": "best_sig08_spnp",
+  "pipeline_config": {
+    "pipeline": "best_sig08_spnp",
+    "families": "tag36h11",
+    "quad_decimate": 0.5,
+    "quad_sigma": 0.8,
+    "refine_edges": 1,
+    "decode_sharpening": 0.25,
+    "pose_backend": "solvepnp",
+    "nthreads": 2,
+    "tag_size_ref_m": 0.05
+  },
+  "method": "Blender 5.2.2 LTS render (frozen inputs); pupil-apriltags detect [pipeline=best_sig08_spnp qd=0.5 qs=0.8 refine=1 sharp=0.25 pose=solvepnp]; no lens distortion",
+  "family": "tag36h11",
+  "intrinsics_px": {
+    "fx": 500.0,
+    "fy": 500.0,
+    "cx": 320.0,
+    "cy": 240.0
+  },
+  "configured_tag_sizes_m": {
+    "0": 0.095,
+    "4": 0.06725
+  },
+  "tags": [
+    {
+      "id": 0,
+      "size_m": 0.095,
+      "expected_camera_xyz_m": [
+        -0.1145,
+        0.1712,
+        0.7752
+      ],
+      "blender_euler_xyz_rad": [
+        -0.4458,
+        0.428,
+        -0.2677
+      ]
+    },
+    {
+      "id": 4,
+      "size_m": 0.06725,
+      "expected_camera_xyz_m": [
+        0.2803,
+        -0.0081,
+        0.9577
+      ],
+      "blender_euler_xyz_rad": [
+        -0.2298,
+        0.7801,
+        -0.432
+      ]
+    }
+  ],
+  "frozen_input": "/home/mfk01/Projects/econ-systems/demo/experiments_wide/inputs/011/input.png",
+  "detections": {
+    "0": {
+      "expected_camera_xyz_m": [
+        -0.1145,
+        0.1712,
+        0.7752
+      ],
+      "pose_backend": "solvepnp",
+      "estimated_camera_xyz_m": [
+        -0.11567334930800292,
+        0.17289125384286902,
+        0.7829242295298808
+      ],
+      "position_error_m": 0.007993798220489009,
+      "rotation_error_deg": 0.1493833369298021,
+      "corners_px": [
+        [
+          276.84,
+          325.75
+        ],
+        [
+          221.38,
+          315.36
+        ],
+        [
+          212.25,
+          377.68
+        ],
+        [
+          270.8,
+          385.33
+        ]
+      ],
+      "expected_blender_euler_xyz_rad": [
+        -0.4458,
+        0.428,
+        -0.2677
+      ]
+    }
+  },
+  "all_expected_ids_detected": false,
+  "thresholds": {
+    "max_position_error_m": 0.03,
+    "max_relative_translation_error_m": 0.02,
+    "max_relative_distance_error_m": 0.02,
+    "max_rotation_error_deg": 5.0
+  },
+  "sanity_check_passed": false
+}

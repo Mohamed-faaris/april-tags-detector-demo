@@ -1,0 +1,21 @@
+{
+  "library": "apriltag",
+  "config": {
+    "library": "apriltag",
+    "quad_decimate": 0.5,
+    "quad_sigma": 0.8,
+    "refine_edges": 1,
+    "decode_sharpening": 0.25,
+    "pose_backend": "solvepnp_locked"
+  },
+  "num_experiments": 60,
+  "passed": 18,
+  "mean_detect_ms": 5.45,
+  "mean_tag0_pos_m": 0.007540074567824585,
+  "mean_tag0_rot_deg": 0.46991987900917137,
+  "mean_tag4_pos_m": 0.02367607571310304,
+  "mean_tag4_rot_deg": 7.021757294711883,
+  "mean_rel_trans_m": 0.03040142515626275,
+  "mean_rel_dist_m": 0.023927755261858686,
+  "mean_rel_rot_deg": 7.143634746008282
+}

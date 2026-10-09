@@ -242,14 +242,30 @@ def main() -> int:
                   "decode_sharpening": args.decode_sharpening,
                   "pose_backend": "solvepnp_locked"}
         out_dir = (args.out_root / f"lib_{lib}").resolve()
-        # Calibrate corner mapping on one frozen frame.
-        cal_gray = cv2.imread(str(args.inputs_dir / args.calib_exp / "input.png"),
-                              cv2.IMREAD_GRAYSCALE)
-        cal_gt = json.loads((args.inputs_dir / args.calib_exp / "ground_truth.json")
-                            .read_text(encoding="utf-8"))
-        cal_specs = [(int(t["id"]), float(t["size_m"]), tuple(t["expected_camera_xyz_m"]),
-                      tuple(t["blender_euler_xyz_rad"])) for t in cal_gt["tags"]]
-        mapping = calibrate_mapping(lib, detector, cal_gray, cal_specs)
+        # Calibrate corner mapping on frozen frames: scan experiments in order
+        # and lock the first frame where both tags are detected and the best
+        # mapping agrees with ground truth (<3 deg). Hard datasets may have
+        # unusable frames, so don't insist on a single calibration exp.
+        mapping: dict | None = None
+        calib_used = ""
+        for calib_exp in exp_ids:
+            cal_gray = cv2.imread(str(args.inputs_dir / calib_exp / "input.png"),
+                                  cv2.IMREAD_GRAYSCALE)
+            if cal_gray is None:
+                continue
+            cal_gt = json.loads((args.inputs_dir / calib_exp / "ground_truth.json")
+                                .read_text(encoding="utf-8"))
+            cal_specs = [(int(t["id"]), float(t["size_m"]), tuple(t["expected_camera_xyz_m"]),
+                          tuple(t["blender_euler_xyz_rad"])) for t in cal_gt["tags"]]
+            try:
+                mapping = calibrate_mapping(lib, detector, cal_gray, cal_specs)
+                calib_used = calib_exp
+                break
+            except RuntimeError as exc:
+                print(f"[{lib}] calibration on {calib_exp} unusable: {exc}")
+        if mapping is None:
+            raise RuntimeError(f"[{lib}] no calibratable frame in {len(exp_ids)} experiments")
+        print(f"[{lib}] calibrated on experiment {calib_used}")
         # Warm-up (exclude Numba/JIT compile from timing for pupil/dt).
         detect_corners(detector, lib, cal_gray)
 

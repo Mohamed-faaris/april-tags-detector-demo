@@ -39,4 +39,29 @@ Use **dt-apriltags** (or pupil-apriltags) with `quad_decimate=0.5, quad_sigma=0.
 ## Reproduce (all via `uv run python`)
 - Best pipeline: `scripts/blender_pose_sanity.py --poses-csv experiments/poses_30.csv --stage process --pipeline best --quad-decimate 0.5 --quad-sigma 0.8 --pose-backend solvepnp`
 - Library benchmark: `scripts/lib_benchmark.py [--libs pupil dt apriltag opencv opencv_subpix]`
+- Exclusion-aware aggregation: `scripts/analyze_runs.py --outputs-root <outputs>`.
+  Tags missed by EVERY runner exclude that experiment from means and are marked `excluded_undetected`.
 - Full table: `experiments/outputs/lib_compare.json`. Per-run artefacts: `experiments/outputs/<pipeline>/<id>/{annotated.png, report.json}` + `summary.{csv,json}`.
+
+## Wide dataset: 60 hard experiments (`experiments_wide/`)
+More rotation (±1 rad), position spread ×3.6, depth to 1.68 m. Same 10 pipelines + 5 libraries retested on frozen inputs. No 180° pose flips anywhere — failures are misses + noisy corners.
+
+| Run | Pass/60 | tag4 miss | t4 pos/rot (mean) | rel. t/rot |
+|---|---|---|---|---|
+| qd05_norefine | 45 | 3 | 17.8 mm / 6.27° | 12.6 mm / 6.55° |
+| qd05_sig08 | 42 | 12 | 14.0 mm / 5.84° | 8.9 mm / 5.89° |
+| qd10_sig08 | 41 | 13 | 14.1 mm / 6.18° | 9.3 mm / 6.26° |
+| qd075 | 41 | 2 | 26.1 mm / 1.13° | 16.8 mm / 1.24° |
+| baseline | 40 | 2 | 26.2 mm / 1.10° | 16.9 mm / 1.21° |
+| best_sig08_spnp | 40 | 12 | 23.1 mm / 8.28° | 17.2 mm / 8.34° |
+| lib_dt / lib_pupil | 40 | 12 | 26.4 mm / 10.21° | 20.2 mm / 10.25° |
+| lib_apriltag | 18 | 12 | 23.7 mm / 7.02° | 30.4 mm / 7.14° |
+| lib_opencv | 7 | 2 | 45.5 mm / 16.72° | 34.9 mm / 16.95° |
+| lib_opencv_subpix | 3 | 2 | 54.6 mm / 10.40° | 40.6 mm / 10.32° |
+
+Findings:
+- **Precision/recall tradeoff of blur**: σ=0.8 is most accurate where it detects, but misses the far tag in 12–13/60 frames (over-blurs small tags). No-blur configs miss only 2–3/60. Tag0 (near) is never missed by any runner.
+- **Pass count alone misleads**: norefine passes most (45/60) via higher recall, but its rotation accuracy is worst of the AprilTag-3 family. Judge recall and accuracy jointly.
+- **OpenCV detects but mis-measures**: only 2 misses, yet 21 badly-estimated tags (worst: 45 mm / 17°) — it latches onto wrong edges of small aliased tags. Subpix doesn't rescue it (3/60).
+- **Exclusion rule**: implemented and verified (it flagged 10 exps mid-run); final tally 60/60 included — across 15 runners every tag was seen at least once. Nothing hidden: `experiments_wide/outputs/analysis.json`.
+- Practical pick for hard scenes: `qd075`/baseline for max coverage; `qd05_sig08`+solvePnP where detection succeeds.

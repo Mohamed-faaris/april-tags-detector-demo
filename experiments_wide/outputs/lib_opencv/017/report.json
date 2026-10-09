@@ -1,0 +1,68 @@
+{
+  "exp_id": "017",
+  "library": "opencv",
+  "detector_config": {
+    "library": "opencv",
+    "quad_decimate": 0.5,
+    "quad_sigma": 0.8,
+    "refine_edges": 1,
+    "decode_sharpening": 0.25,
+    "pose_backend": "solvepnp_locked"
+  },
+  "pose_backend": "solvepnp_locked",
+  "family": "tag36h11",
+  "corner_mapping": {
+    "0": [
+      1,
+      2,
+      1
+    ],
+    "4": [
+      1,
+      2,
+      1
+    ]
+  },
+  "detections": {
+    "0": {
+      "expected_camera_xyz_m": [
+        -0.1807,
+        -0.0818,
+        0.989
+      ],
+      "estimated_camera_xyz_m": [
+        -0.1872744004702365,
+        -0.0855243931029225,
+        1.0226290899766308
+      ],
+      "position_error_m": 0.03446751424435007,
+      "rotation_error_deg": 0.5482331908449763,
+      "corners_px": [
+        [
+          218.0,
+          179.0
+        ],
+        [
+          253.0,
+          177.0
+        ],
+        [
+          240.0,
+          219.0
+        ],
+        [
+          204.0,
+          219.0
+        ]
+      ]
+    }
+  },
+  "all_expected_ids_detected": false,
+  "thresholds": {
+    "max_position_error_m": 0.03,
+    "max_relative_translation_error_m": 0.02,
+    "max_relative_distance_error_m": 0.02,
+    "max_rotation_error_deg": 5.0
+  },
+  "sanity_check_passed": false
+}

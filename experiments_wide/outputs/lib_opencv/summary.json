@@ -1,0 +1,21 @@
+{
+  "library": "opencv",
+  "config": {
+    "library": "opencv",
+    "quad_decimate": 0.5,
+    "quad_sigma": 0.8,
+    "refine_edges": 1,
+    "decode_sharpening": 0.25,
+    "pose_backend": "solvepnp_locked"
+  },
+  "num_experiments": 60,
+  "passed": 7,
+  "mean_detect_ms": 3.61,
+  "mean_tag0_pos_m": 0.020685742382555775,
+  "mean_tag0_rot_deg": 1.6363008406548123,
+  "mean_tag4_pos_m": 0.04547380761566091,
+  "mean_tag4_rot_deg": 16.72132332277542,
+  "mean_rel_trans_m": 0.034943412540502226,
+  "mean_rel_dist_m": 0.02628575765538086,
+  "mean_rel_rot_deg": 16.949737482734104
+}

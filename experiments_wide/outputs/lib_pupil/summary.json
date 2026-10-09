@@ -1,0 +1,21 @@
+{
+  "library": "pupil",
+  "config": {
+    "library": "pupil",
+    "quad_decimate": 0.5,
+    "quad_sigma": 0.8,
+    "refine_edges": 1,
+    "decode_sharpening": 0.25,
+    "pose_backend": "solvepnp_locked"
+  },
+  "num_experiments": 60,
+  "passed": 40,
+  "mean_detect_ms": 7.28,
+  "mean_tag0_pos_m": 0.011142327582893402,
+  "mean_tag0_rot_deg": 0.25790880880281086,
+  "mean_tag4_pos_m": 0.026435825218375533,
+  "mean_tag4_rot_deg": 10.21125273312952,
+  "mean_rel_trans_m": 0.020199359965012452,
+  "mean_rel_dist_m": 0.017993311250791875,
+  "mean_rel_rot_deg": 10.253699989071938
+}

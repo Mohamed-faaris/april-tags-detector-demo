@@ -1,0 +1,68 @@
+{
+  "exp_id": "047",
+  "library": "apriltag",
+  "detector_config": {
+    "library": "apriltag",
+    "quad_decimate": 0.5,
+    "quad_sigma": 0.8,
+    "refine_edges": 1,
+    "decode_sharpening": 0.25,
+    "pose_backend": "solvepnp_locked"
+  },
+  "pose_backend": "solvepnp_locked",
+  "family": "tag36h11",
+  "corner_mapping": {
+    "0": [
+      0,
+      0,
+      0
+    ],
+    "4": [
+      1,
+      0,
+      1
+    ]
+  },
+  "detections": {
+    "0": {
+      "expected_camera_xyz_m": [
+        -0.0281,
+        0.0991,
+        0.7059
+      ],
+      "estimated_camera_xyz_m": [
+        -0.028491012176104967,
+        0.10043937064533992,
+        0.715143740145168
+      ],
+      "position_error_m": 0.009348451001040332,
+      "rotation_error_deg": 0.6479282871734034,
+      "corners_px": [
+        [
+          324.53,
+          335.5
+        ],
+        [
+          262.54,
+          337.2
+        ],
+        [
+          273.1,
+          281.77
+        ],
+        [
+          338.04,
+          283.24
+        ]
+      ]
+    }
+  },
+  "all_expected_ids_detected": false,
+  "thresholds": {
+    "max_position_error_m": 0.03,
+    "max_relative_translation_error_m": 0.02,
+    "max_relative_distance_error_m": 0.02,
+    "max_rotation_error_deg": 5.0
+  },
+  "sanity_check_passed": false
+}
