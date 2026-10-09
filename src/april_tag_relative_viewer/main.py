@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import argparse
 import math
+import os
 import sys
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -61,7 +63,31 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--pose-backend", default="solvepnp", choices=("solvepnp", "tag_pose"),
                         help="solvepnp: cv2.solvePnP with true tag size (best benchmarked); "
                              "tag_pose: detector pose scaled to tag size")
+    parser.add_argument("--smooth-alpha", type=float, default=0.45,
+                        help="pose smoothing 0..1 (higher = snappier, lower = steadier; 1 disables)")
+    parser.add_argument("--max-reproj-px", type=float, default=3.0,
+                        help="reject detections whose solvePnP reprojection error exceeds this (px)")
+    parser.add_argument("--max-missed", type=int, default=5,
+                        help="drop smoothed tracks unseen for this many frames")
     return parser.parse_args()
+
+
+@contextmanager
+def suppress_native_noise():
+    """Silence C-level printf chatter (e.g. AprilTag union-find 'minima'
+    diagnostics) emitted by the detector around each detect() call."""
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    saved_out, saved_err = os.dup(1), os.dup(2)
+    try:
+        os.dup2(devnull, 1)
+        os.dup2(devnull, 2)
+        yield
+    finally:
+        os.dup2(saved_out, 1)
+        os.dup2(saved_err, 2)
+        os.close(saved_out)
+        os.close(saved_err)
+        os.close(devnull)
 
 
 def camera_model(width: int, height: int, calibration: Path | None, fov: float) -> tuple[np.ndarray, np.ndarray]:
@@ -93,7 +119,7 @@ def solvepnp_pose(corners: np.ndarray, size_m: float, camera: np.ndarray,
         np.array([[-half, half, 0], [half, half, 0], [half, -half, 0], [-half, -half, 0]], dtype=np.float64),
     ]
     image = np.ascontiguousarray(np.asarray(corners, dtype=np.float64).reshape(4, 2))
-    best: tuple[float, np.ndarray, np.ndarray] | None = None
+    best: tuple[float, np.ndarray, np.ndarray, float] | None = None
     for obj_points in variants:
         for reverse in (False, True):
             points = image[::-1] if reverse else image
@@ -105,11 +131,78 @@ def solvepnp_pose(corners: np.ndarray, size_m: float, camera: np.ndarray,
                     continue
                 rotation = cv2.Rodrigues(rvec)[0]
                 score = rotation_error_degrees(rotation, prior_rotation) if prior_rotation is not None else 0.0
+                projected, _ = cv2.projectPoints(obj_points, rvec, tvec, camera, distortion)
+                reproj = float(np.mean(np.linalg.norm(projected.reshape(4, 2) - ordered, axis=1)))
                 if best is None or score < best[0]:
-                    best = (score, rotation, tvec.reshape(3))
+                    best = (score, rotation, tvec.reshape(3), reproj)
     if best is None:
         return None
-    return best[1], best[2]
+    return best[1], best[2], best[3]
+
+
+def rotation_to_quaternion(rotation: np.ndarray) -> np.ndarray:
+    r = np.asarray(rotation, dtype=np.float64)
+    trace = float(np.trace(r))
+    if trace > 0.0:
+        s = 0.5 / math.sqrt(trace + 1.0)
+        return np.array([0.25 / s, (r[2, 1] - r[1, 2]) * s, (r[0, 2] - r[2, 0]) * s, (r[1, 0] - r[0, 1]) * s])
+    if r[0, 0] > r[1, 1] and r[0, 0] > r[2, 2]:
+        s = 2.0 * math.sqrt(1.0 + r[0, 0] - r[1, 1] - r[2, 2])
+        return np.array([(r[2, 1] - r[1, 2]) / s, 0.25 * s, (r[0, 1] + r[1, 0]) / s, (r[0, 2] + r[2, 0]) / s])
+    if r[1, 1] > r[2, 2]:
+        s = 2.0 * math.sqrt(1.0 + r[1, 1] - r[0, 0] - r[2, 2])
+        return np.array([(r[0, 2] - r[2, 0]) / s, (r[0, 1] + r[1, 0]) / s, 0.25 * s, (r[1, 2] + r[2, 1]) / s])
+    s = 2.0 * math.sqrt(1.0 + r[2, 2] - r[0, 0] - r[1, 1])
+    return np.array([(r[1, 0] - r[0, 1]) / s, (r[0, 2] + r[2, 0]) / s, (r[1, 2] + r[2, 1]) / s, 0.25 * s])
+
+
+def quaternion_to_rotation(quat: np.ndarray) -> np.ndarray:
+    w, x, y, z = (float(v) for v in np.asarray(quat, dtype=np.float64).reshape(4))
+    norm = math.sqrt(w * w + x * x + y * y + z * z) or 1.0
+    w, x, y, z = w / norm, x / norm, y / norm, z / norm
+    return np.array([
+        [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+        [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+        [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
+    ])
+
+
+class PoseFilter:
+    """Per-tag exponential smoother: EMA on translation, NLERP on rotation.
+
+    Kills high-frequency pose jitter. Stale tracks (tag unseen) age out
+    after `max_missed` frames so ghost poses don't linger.
+    """
+
+    def __init__(self, alpha: float = 0.45, max_missed: int = 5) -> None:
+        self.alpha = alpha
+        self.max_missed = max_missed
+        self._state: dict[int, tuple[np.ndarray, np.ndarray, int]] = {}
+
+    def update(self, marker_id: int, translation: np.ndarray, rotation: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        translation = np.asarray(translation, dtype=np.float64).reshape(3)
+        if marker_id not in self._state:
+            self._state[marker_id] = (translation, np.asarray(rotation, dtype=np.float64), 0)
+            return translation, np.asarray(rotation, dtype=np.float64)
+        prev_t, prev_r, _ = self._state[marker_id]
+        smooth_t = self.alpha * translation + (1.0 - self.alpha) * prev_t
+        q_new = rotation_to_quaternion(rotation)
+        q_prev = rotation_to_quaternion(prev_r)
+        if float(q_new @ q_prev) < 0.0:
+            q_new = -q_new
+        q_smooth = self.alpha * q_new + (1.0 - self.alpha) * q_prev
+        smooth_r = quaternion_to_rotation(q_smooth)
+        self._state[marker_id] = (smooth_t, smooth_r, 0)
+        return smooth_t, smooth_r
+
+    def mark_seen(self, seen_ids: set[int]) -> None:
+        for marker_id in list(self._state):
+            if marker_id not in seen_ids:
+                prev_t, prev_r, missed = self._state[marker_id]
+                if missed + 1 >= self.max_missed:
+                    del self._state[marker_id]
+                else:
+                    self._state[marker_id] = (prev_t, prev_r, missed + 1)
 
 
 def euler_xyz_degrees(rotation: np.ndarray) -> tuple[float, float, float]:
@@ -253,6 +346,7 @@ def main() -> None:
         decode_sharpening=0.25,
     )
     overlays = Overlays()
+    pose_filter = PoseFilter(alpha=args.smooth_alpha, max_missed=args.max_missed)
     camera = distortion = None
     cv2.namedWindow("AprilTag relative pose", cv2.WINDOW_NORMAL)
 
@@ -263,12 +357,14 @@ def main() -> None:
                 camera, distortion = camera_model(width, height, args.calibration, args.fov)
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             intrinsics = (float(camera[0, 0]), float(camera[1, 1]), float(camera[0, 2]), float(camera[1, 2]))
-            detections = detector.detect(
-                gray,
-                estimate_tag_pose=True,
-                camera_params=intrinsics,
-                tag_size=args.tag_size,
-            )
+            detections = []
+            with suppress_native_noise():
+                detections = detector.detect(
+                    gray,
+                    estimate_tag_pose=True,
+                    camera_params=intrinsics,
+                    tag_size=args.tag_size,
+                )
             corners = [np.asarray(detection.corners, dtype=np.float32) for detection in detections]
             ids = np.asarray([detection.tag_id for detection in detections], dtype=np.int32)
             poses: dict[int, tuple[np.ndarray, np.ndarray]] = {}
@@ -282,9 +378,14 @@ def main() -> None:
                     # Refit with the TRUE tag size (benchmarked: ~25% better rotation).
                     refined = solvepnp_pose(np.asarray(detection.corners), size,
                                             camera, distortion, rotation)
-                    if refined is not None:
-                        rotation, translation = refined
+                    if refined is None:
+                        continue
+                    rotation, translation, reproj_err = refined
+                    if reproj_err > args.max_reproj_px:
+                        continue  # wild fit (e.g. extreme tilt): don't feed the filter
+                translation, rotation = pose_filter.update(marker_id, translation, rotation)
                 poses[marker_id] = (rotation, translation)
+            pose_filter.mark_seen(set(poses))
             annotate(frame, corners, ids, poses, overlays, args.axis_length, camera, distortion)
             origin = min(poses) if poses else None
             state = f"Tags: {len(poses)} | origin: {origin if origin is not None else 'none'}"

@@ -27,7 +27,9 @@ import argparse
 import csv
 import json
 import math
+import os
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 import cv2
@@ -53,6 +55,24 @@ from blender_pose_sanity import (  # noqa: E402
 )
 
 ALL_LIBS = ("pupil", "dt", "apriltag", "opencv", "opencv_subpix")
+
+
+@contextmanager
+def suppress_native_noise():
+    """Silence C-level printf chatter (e.g. AprilTag union-find 'minima'
+    diagnostics) emitted by native detectors."""
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    saved_out, saved_err = os.dup(1), os.dup(2)
+    try:
+        os.dup2(devnull, 1)
+        os.dup2(devnull, 2)
+        yield
+    finally:
+        os.dup2(saved_out, 1)
+        os.dup2(saved_err, 2)
+        os.close(saved_out)
+        os.close(saved_err)
+        os.close(devnull)
 
 
 def make_detector(lib: str, quad_decimate: float, quad_sigma: float,
@@ -88,10 +108,12 @@ def detect_corners(detector, lib: str, gray: np.ndarray) -> list[tuple[int, np.n
     """Return [(tag_id, corners_4x2_px)] for one image."""
     if lib in ("pupil", "dt"):
         out = []
-        for det in detector.detect(
+        with suppress_native_noise():
+            detections = detector.detect(
                 gray, estimate_tag_pose=True,
                 camera_params=(FOCAL_PIXELS, FOCAL_PIXELS, WIDTH / 2.0, HEIGHT / 2.0),
-                tag_size=REFERENCE_SIZE_M):
+                tag_size=REFERENCE_SIZE_M)
+        for det in detections:
             tag_id = int(det.tag_id)
             if tag_id in TAG_SIZES_M:
                 out.append((tag_id, np.asarray(det.corners, dtype=float).reshape(4, 2)))
