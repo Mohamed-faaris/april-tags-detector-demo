@@ -12,6 +12,11 @@ import cv2
 import numpy as np
 from pupil_apriltags import Detector
 
+# Best benchmarked detector settings (30/30 on easy set, best wide-set
+# accuracy where detected): quad_decimate=0.5, quad_sigma=0.8.
+BEST_QUAD_DECIMATE = 0.5
+BEST_QUAD_SIGMA = 0.8
+
 # Per-ID printed tag edge lengths in metres for this setup. Command-line
 # --marker-size entries override these values.
 MARKER_SIZES_M: dict[int, float] = {
@@ -49,6 +54,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--calibration", type=Path, help="NPZ with camera_matrix and dist_coeffs arrays")
     parser.add_argument("--fov", type=float, default=60.0, help="approximate horizontal camera FOV in degrees without calibration")
     parser.add_argument("--axis-length", type=float, default=0.03, help="drawn axis length in metres")
+    parser.add_argument("--quad-decimate", type=float, default=BEST_QUAD_DECIMATE,
+                        help="detector decimation (best benchmarked: %(default)s)")
+    parser.add_argument("--quad-sigma", type=float, default=BEST_QUAD_SIGMA,
+                        help="detector blur sigma (best benchmarked: %(default)s)")
+    parser.add_argument("--pose-backend", default="solvepnp", choices=("solvepnp", "tag_pose"),
+                        help="solvepnp: cv2.solvePnP with true tag size (best benchmarked); "
+                             "tag_pose: detector pose scaled to tag size")
     return parser.parse_args()
 
 
@@ -58,6 +70,46 @@ def camera_model(width: int, height: int, calibration: Path | None, fov: float) 
             return np.asarray(data["camera_matrix"], dtype=np.float64), np.asarray(data["dist_coeffs"], dtype=np.float64)
     focal = width / (2.0 * math.tan(math.radians(fov) / 2.0))
     return np.array([[focal, 0, width / 2], [0, focal, height / 2], [0, 0, 1]], dtype=np.float64), np.zeros((5, 1))
+
+
+def rotation_error_degrees(first: np.ndarray, second: np.ndarray) -> float:
+    delta = np.asarray(first, dtype=float) @ np.asarray(second, dtype=float).T
+    cos_angle = float(np.clip((np.trace(delta) - 1.0) / 2.0, -1.0, 1.0))
+    return math.degrees(math.acos(cos_angle))
+
+
+def solvepnp_pose(corners: np.ndarray, size_m: float, camera: np.ndarray,
+                  distortion: np.ndarray, prior_rotation: np.ndarray | None) -> tuple[np.ndarray, np.ndarray] | None:
+    """Refit pose with true tag size; disambiguate correspondence via prior rotation.
+
+    Mirrors the benchmark-winning backend: tries both object-point conventions
+    x 4 cyclic shifts x both corner windings and keeps the candidate closest
+    to the detector's own rotation (size-independent), dodging the planar
+    180° ambiguity that reprojection error alone cannot resolve.
+    """
+    half = float(size_m) / 2.0
+    variants = [
+        np.array([[-half, -half, 0], [half, -half, 0], [half, half, 0], [-half, half, 0]], dtype=np.float64),
+        np.array([[-half, half, 0], [half, half, 0], [half, -half, 0], [-half, -half, 0]], dtype=np.float64),
+    ]
+    image = np.ascontiguousarray(np.asarray(corners, dtype=np.float64).reshape(4, 2))
+    best: tuple[float, np.ndarray, np.ndarray] | None = None
+    for obj_points in variants:
+        for reverse in (False, True):
+            points = image[::-1] if reverse else image
+            for shift in range(4):
+                ordered = np.ascontiguousarray(np.roll(points, shift, axis=0))
+                ok, rvec, tvec = cv2.solvePnP(obj_points, ordered, camera, distortion,
+                                              flags=cv2.SOLVEPNP_ITERATIVE)
+                if not ok:
+                    continue
+                rotation = cv2.Rodrigues(rvec)[0]
+                score = rotation_error_degrees(rotation, prior_rotation) if prior_rotation is not None else 0.0
+                if best is None or score < best[0]:
+                    best = (score, rotation, tvec.reshape(3))
+    if best is None:
+        return None
+    return best[1], best[2]
 
 
 def euler_xyz_degrees(rotation: np.ndarray) -> tuple[float, float, float]:
@@ -195,8 +247,8 @@ def main() -> None:
     detector = Detector(
         families=f"tag{args.dictionary}",
         nthreads=2,
-        quad_decimate=1.0,
-        quad_sigma=0.0,
+        quad_decimate=args.quad_decimate,
+        quad_sigma=args.quad_sigma,
         refine_edges=1,
         decode_sharpening=0.25,
     )
@@ -226,6 +278,12 @@ def main() -> None:
                 rotation = np.asarray(detection.pose_R, dtype=np.float64)
                 # AprilTag pose translation scales linearly with physical tag edge size.
                 translation = np.asarray(detection.pose_t, dtype=np.float64).reshape(3) * (size / args.tag_size)
+                if args.pose_backend == "solvepnp":
+                    # Refit with the TRUE tag size (benchmarked: ~25% better rotation).
+                    refined = solvepnp_pose(np.asarray(detection.corners), size,
+                                            camera, distortion, rotation)
+                    if refined is not None:
+                        rotation, translation = refined
                 poses[marker_id] = (rotation, translation)
             annotate(frame, corners, ids, poses, overlays, args.axis_length, camera, distortion)
             origin = min(poses) if poses else None

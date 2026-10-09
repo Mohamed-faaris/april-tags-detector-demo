@@ -36,6 +36,12 @@ Why OpenCV lags: default integer-pixel corners (≈0.9 px quantization → ~2° 
 ## Recommendation
 Use **dt-apriltags** (or pupil-apriltags) with `quad_decimate=0.5, quad_sigma=0.8, refine_edges=1` + solvePnP-on-true-size pose backend.
 
+## Figures (`experiments/figures/`, `experiments_wide/figures/`)
+`scripts/plot_results.py` renders pass-rate bars (with tag4-miss annotations), mean relative-error bars, library speed-vs-accuracy scatter, and per-pipeline error boxplots — e.g. Easy30 boxplot shows σ=0.8 pipelines halving the error spread.
+
+## Live viewer uses the winner
+`src/april_tag_relative_viewer/main.py` now defaults to `quad_decimate=0.5, quad_sigma=0.8` with the solvePnP-on-true-size backend (prior-disambiguated, distortion-aware); overridable via `--quad-decimate/--quad-sigma/--pose-backend tag_pose`.
+
 ## Reproduce (all via `uv run python`)
 - Best pipeline: `scripts/blender_pose_sanity.py --poses-csv experiments/poses_30.csv --stage process --pipeline best --quad-decimate 0.5 --quad-sigma 0.8 --pose-backend solvepnp`
 - Library benchmark: `scripts/lib_benchmark.py [--libs pupil dt apriltag opencv opencv_subpix]`
