@@ -72,6 +72,13 @@ def parse_args() -> argparse.Namespace:
                              "(camera_calibration.npz, camera_calibration.json, or camera_info.yaml)")
     parser.add_argument("--fov", type=float, default=60.0, help="approximate horizontal camera FOV in degrees without calibration")
     parser.add_argument("--axis-length", type=float, default=0.03, help="drawn axis length in metres")
+    parser.add_argument("--width", type=int, default=1920, help="requested stream width (default: 1920, max detail)")
+    parser.add_argument("--height", type=int, default=1080, help="requested stream height (default: 1080)")
+    parser.add_argument("--fps", type=float, default=30.0, help="requested stream fps (default: 30)")
+    parser.add_argument("--fourcc", default="MJPG", help="requested pixel format for USB bandwidth (default: MJPG; empty to skip)")
+    parser.add_argument("--interactive", "-i", action="store_true",
+                        help="step-by-step setup: pick video device (with preview), calibration, "
+                             "profile; remembers answers and prints the command to skip it next time")
     parser.add_argument("--quad-decimate", type=float, default=BEST_QUAD_DECIMATE,
                         help="detector decimation (best benchmarked: %(default)s)")
     parser.add_argument("--quad-sigma", type=float, default=BEST_QUAD_SIGMA,
@@ -364,19 +371,19 @@ def draw_pose_table(frame: np.ndarray, poses: dict[int, tuple[np.ndarray, np.nda
     height = frame.shape[0]
     panel = np.zeros((height, panel_width, 3), dtype=np.uint8)
     panel[:] = (28, 31, 38)
-    cv2.putText(panel, "POSES RELATIVE TO LOWEST ID (mm)", (18, 26), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (235, 240, 250), 2, cv2.LINE_AA)
+    cv2.putText(panel, "POSES RELATIVE TO LOWEST ID (mm)", (18, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.62, (235, 240, 250), 2, cv2.LINE_AA)
     columns = [("ID", 18), ("d", 62), ("x", 122), ("y", 192), ("z", 262),
                ("rx°", 332), ("ry°", 392), ("rz°", 452)]
     for label, x_pos in columns:
-        cv2.putText(panel, label, (x_pos, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (165, 185, 210), 1, cv2.LINE_AA)
-    cv2.line(panel, (16, 58), (panel_width - 16, 58), (75, 82, 95), 1, cv2.LINE_AA)
+        cv2.putText(panel, label, (x_pos, 56), cv2.FONT_HERSHEY_SIMPLEX, 0.46, (165, 185, 210), 1, cv2.LINE_AA)
+    cv2.line(panel, (16, 64), (panel_width - 16, 64), (75, 82, 95), 1, cv2.LINE_AA)
 
     if not poses:
         cv2.putText(panel, "No tags detected", (18, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.50, (165, 175, 190), 1, cv2.LINE_AA)
     else:
         origin_id = min(poses)
-        row_height = 26
-        top0 = 66
+        row_height = 32
+        top0 = 74
         visible = max(1, (height - 8 - top0) // row_height)
         ids_sorted = sorted(poses)
         top_index = 0
@@ -400,7 +407,7 @@ def draw_pose_table(frame: np.ndarray, poses: dict[int, tuple[np.ndarray, np.nda
             values = [str(marker_id), f"{distance:.1f}", f"{x:+.1f}", f"{y:+.1f}", f"{z:+.1f}",
                       f"{rx:+.1f}", f"{ry:+.1f}", f"{rz:+.1f}"]
             for value, (_label, x_pos) in zip(values, columns):
-                cv2.putText(panel, value, (x_pos, top + 16), cv2.FONT_HERSHEY_SIMPLEX, 0.38, color, 1, cv2.LINE_AA)
+                cv2.putText(panel, value, (x_pos, top + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.48, color, 1, cv2.LINE_AA)
             cv2.line(panel, (16, top + row_height - 2), (panel_width - 16, top + row_height - 2), (60, 66, 78), 1, cv2.LINE_AA)
         hints = []
         if top_index > 0:
@@ -450,6 +457,18 @@ def annotate(frame: np.ndarray, corners: list[np.ndarray], ids: np.ndarray | Non
 
 def main() -> None:
     args = parse_args()
+    if args.interactive:
+        from .wizard import run_wizard
+        current = {"tag_size": args.tag_size, "dictionary": args.dictionary}
+        values, _command = run_wizard(current)
+        args.source = values["source"]
+        args.calibration = Path(values["calibration"]) if values["calibration"] else None
+        args.width = values["width"]
+        args.height = values["height"]
+        args.fps = values["fps"]
+        args.fourcc = values["fourcc"]
+        args.tag_size = values["tag_size"]
+        args.dictionary = values["dictionary"]
     if args.tag_size <= 0:
         raise SystemExit("--tag-size must be positive")
     marker_sizes = dict(MARKER_SIZES_M)
@@ -481,6 +500,20 @@ def main() -> None:
     if not ok:
         capture.release()
         raise SystemExit(f"Could not read frames from camera or video source {args.source!r}")
+
+    if isinstance(source, int):
+        # Ask for the high-resolution profile (e.g. 1920x1080@30); the driver
+        # falls back to the nearest supported mode, actual values are logged.
+        if args.fourcc:
+            fourcc = cv2.VideoWriter_fourcc(*args.fourcc[:4])
+            capture.set(cv2.CAP_PROP_FOURCC, fourcc)
+        capture.set(cv2.CAP_PROP_FRAME_WIDTH, args.width)
+        capture.set(cv2.CAP_PROP_FRAME_HEIGHT, args.height)
+        capture.set(cv2.CAP_PROP_FPS, args.fps)
+        ok, frame = capture.read()
+        if not ok:
+            capture.release()
+            raise SystemExit("Camera stopped returning frames after applying stream settings")
 
     height, width = frame.shape[:2]
     log_camera_info(capture, source, width, height, args)
