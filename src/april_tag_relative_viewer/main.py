@@ -363,17 +363,17 @@ def draw_help(frame: np.ndarray, overlays: Overlays) -> None:
 
 
 def draw_pose_table(frame: np.ndarray, poses: dict[int, tuple[np.ndarray, np.ndarray]], overlays: Overlays,
-                    scroll: dict | None = None) -> np.ndarray:
+                    scroll: dict | None = None, marker_sizes: dict | None = None) -> np.ndarray:
     """Draw relative poses (mm) in a fixed left panel; Up/Down scrolls long lists."""
     if not overlays.pose:
         return frame
-    panel_width = min(560, max(520, frame.shape[1] // 2))
+    panel_width = min(640, max(600, frame.shape[1] // 2))
     height = frame.shape[0]
     panel = np.zeros((height, panel_width, 3), dtype=np.uint8)
     panel[:] = (28, 31, 38)
     cv2.putText(panel, "POSES RELATIVE TO LOWEST ID (mm)", (18, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.62, (235, 240, 250), 2, cv2.LINE_AA)
-    columns = [("ID", 18), ("d", 62), ("x", 122), ("y", 192), ("z", 262),
-               ("rx°", 332), ("ry°", 392), ("rz°", 452)]
+    columns = [("ID", 18), ("d", 62), ("sz", 120), ("x", 168), ("y", 232), ("z", 296),
+               ("rx°", 362), ("ry°", 422), ("rz°", 482)]
     for label, x_pos in columns:
         cv2.putText(panel, label, (x_pos, 56), cv2.FONT_HERSHEY_SIMPLEX, 0.46, (165, 185, 210), 1, cv2.LINE_AA)
     cv2.line(panel, (16, 64), (panel_width - 16, 64), (75, 82, 95), 1, cv2.LINE_AA)
@@ -404,7 +404,9 @@ def draw_pose_table(frame: np.ndarray, poses: dict[int, tuple[np.ndarray, np.nda
                 hidden_below = len(ids_sorted) - top_index - row
                 break
             color = (105, 225, 150) if marker_id == origin_id else (235, 240, 250)
-            values = [str(marker_id), f"{distance:.1f}", f"{x:+.1f}", f"{y:+.1f}", f"{z:+.1f}",
+            size_mm = (marker_sizes or {}).get(marker_id)
+            size_text = f"{size_mm * 1000.0:.0f}" if size_mm else "?"
+            values = [str(marker_id), f"{distance:.1f}", size_text, f"{x:+.1f}", f"{y:+.1f}", f"{z:+.1f}",
                       f"{rx:+.1f}", f"{ry:+.1f}", f"{rz:+.1f}"]
             for value, (_label, x_pos) in zip(values, columns):
                 cv2.putText(panel, value, (x_pos, top + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.48, color, 1, cv2.LINE_AA)
@@ -578,7 +580,7 @@ def main() -> None:
             cv2.putText(frame, state, (max(12, width - 285), 26), cv2.FONT_HERSHEY_SIMPLEX, 0.58, (255, 255, 255), 2, cv2.LINE_AA)
             if overlays.help:
                 draw_help(frame, overlays)
-            display = draw_pose_table(frame, poses, overlays, table_scroll)
+            display = draw_pose_table(frame, poses, overlays, table_scroll, marker_sizes)
             cv2.imshow("AprilTag relative pose", display)
             key = cv2.waitKey(1) & 0xFF
             if key in (ord("q"), 27):
